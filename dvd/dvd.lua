@@ -14,6 +14,8 @@ MusicUtil = require "musicutil"
 viewport = { width = 128, height = 64 }
 focus = { x = 10, y = 10 }
 movement_vector = { x = 1, y = 1 }
+if math.random(-1, 1) == -1 then movement_vector.x = -1 end
+if math.random(-1, 1) == -1 then movement_vector.y = -1 end
 alt = false
 running = true
 dvd_icon_fill_level = 15
@@ -55,28 +57,36 @@ end
 
 -- notes_off_metro = metro.init()
 
-function all_notes_off()
-  if (params:get("out") == 2 or params:get("out") == 3) then
-    for _, a in pairs(active_notes) do
-      midi_device:note_off(a, nil, midi_channel)
-    end
-  end
-  active_notes = {}
-end
+-- function all_notes_off()
+--   if (params:get("out") == 2 or params:get("out") == 3) then
+--     for _, a in pairs(active_notes) do
+--       midi_device:note_off(a, nil, midi_channel)
+--     end
+--   end
+--   active_notes = {}
+-- end
 
 function init() ------------------------------ init() is automatically called by norns
   message = "DVD Menu" ----------------- set our initial message
   screen_dirty = true ------------------------ ensure we only redraw when something changes
-  redraw_clock_id = clock.run(redraw_clock) -- create a "redraw_clock" and note the id
-  focus.x = math.random(viewport.width - #dvd_icon_table[1])
-  focus.y = math.random(viewport.height - #dvd_icon_table)
+  -- redraw_clock_id = clock.run(redraw_clock) -- create a "redraw_clock" and note the id
+  focus.x = math.random(viewport.width - #dvd_icon_table[1] - 2)
+  focus.y = math.random(viewport.height - #dvd_icon_table - 2)
+
+  for i = 1, #MusicUtil.SCALES do
+    table.insert(scale_names, string.lower(MusicUtil.SCALES[i].name))
+  end
+
   init_params()
   build_scale()
   hs.init()
+  step_id = clock.run(step)
   -- notes_off_metro.event = all_notes_off
 end
 
 function init_params()
+    params:add_separator("DVD")
+    params:add{type = "number", id = "step_div", name = "step division", min = 1, max = 16, default = 4}
     params:add{type = "option", id = "note_length", name = "note length",
       options = {"25%", "50%", "75%", "100%"},
       default = 4}
@@ -110,13 +120,29 @@ function press_down(i) ---------- a key has been pressed
   message = "press down " .. i -- build a message
 end
 
+
+function step()
+  while true do
+    clock.sync(1/params:get("step_div"))
+    sequence_step()
+    screen_dirty = true
+    if g then
+        grid_redraw()
+      end
+    if screen_dirty then ---- only if something changed
+      redraw() -------------- redraw space
+      screen_dirty = false -- and everything is clean again
+    end
+  end
+end
+
 function redraw_clock() ----- a clock that draws space
   while true do ------------- "while true do" means "do this forever"
     clock.sleep(1/15) ------- pause for a fifteenth of a second (aka 15fps)
     step()
     screen_dirty = true
     if g then
-        gridredraw()
+        grid_redraw()
       end
     if screen_dirty then ---- only if something changed
       redraw() -------------- redraw space
@@ -127,7 +153,7 @@ end
 
 function redraw() -------------- redraw() is automatically called by norns
   screen.clear() --------------- clear space
-  -- screen.aa(1) ----------------- enable anti-aliasing
+  screen.aa(1) ----------------- enable anti-aliasing
   draw_dvd_icon()
 
 
@@ -170,7 +196,7 @@ function draw_dvd_icon()
   screen.stroke()
 end
 
-function gridredraw()
+function grid_redraw()
   local grid_h = g.rows
   g:all(0)
   local grid_x = math.floor((focus.x + #dvd_icon_table[1]) / 8) + 1
@@ -181,7 +207,43 @@ function gridredraw()
 end
 
 
-function step()
+
+
+function stop()
+  running = false
+  -- all_notes_off()
+end
+
+function start()
+  running = true
+end
+
+function reset()
+  one.pos = 1
+  two.pos = 1
+end
+
+function clock.transport.start()
+  start()
+end
+
+function clock.transport.stop()
+  stop()
+end
+
+function clock.transport.reset()
+  reset()
+end
+
+function r() ----------------------------- execute r() in the repl to quickly rerun this script
+  norns.script.load(norns.state.script) -- https://github.com/monome/norns/blob/main/lua/core/state.lua
+end
+
+function cleanup() --------------- cleanup() is automatically called on script close
+  clock.cancel(step_id) -- melt our clock vie the id we noted
+end
+
+function sequence_step()
   -- while true do
     -- clock.sync(1/60)
   local curFocus = focus
@@ -213,38 +275,4 @@ function step()
   -- notes_off_metro:start((60 / params:get("clock_tempo") / params:get("step_div")) * params:get("note_length") * 0.25, 1)
   end
 
-end
-
-function stop()
-  running = false
-  all_notes_off()
-end
-
-function start()
-  running = true
-end
-
-function reset()
-  one.pos = 1
-  two.pos = 1
-end
-
-function clock.transport.start()
-  start()
-end
-
-function clock.transport.stop()
-  stop()
-end
-
-function clock.transport.reset()
-  reset()
-end
-
-function r() ----------------------------- execute r() in the repl to quickly rerun this script
-  norns.script.load(norns.state.script) -- https://github.com/monome/norns/blob/main/lua/core/state.lua
-end
-
-function cleanup() --------------- cleanup() is automatically called on script close
-  clock.cancel(redraw_clock_id) -- melt our clock vie the id we noted
 end
