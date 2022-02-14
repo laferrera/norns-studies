@@ -8,6 +8,7 @@
 -- >> e3:
 
 engine.name = 'PolyPerc'
+hs = include('lib/halfsecond')
 
 MusicUtil = require "musicutil"
 viewport = { width = 128, height = 64 }
@@ -41,6 +42,7 @@ two = {
 scale_names = {}
 notes = {}
 active_notes = {}
+g = grid.connect()
 
 function build_scale()
   notes = MusicUtil.generate_scale_of_length(params:get("root_note"), params:get("scale_mode"), 16)
@@ -70,6 +72,7 @@ function init() ------------------------------ init() is automatically called by
   focus.y = math.random(viewport.height - #dvd_icon_table)
   init_params()
   build_scale()
+  hs.init()
   -- notes_off_metro.event = all_notes_off
 end
 
@@ -112,6 +115,9 @@ function redraw_clock() ----- a clock that draws space
     clock.sleep(1/15) ------- pause for a fifteenth of a second (aka 15fps)
     step()
     screen_dirty = true
+    if g then
+        gridredraw()
+      end
     if screen_dirty then ---- only if something changed
       redraw() -------------- redraw space
       screen_dirty = false -- and everything is clean again
@@ -164,6 +170,17 @@ function draw_dvd_icon()
   screen.stroke()
 end
 
+function gridredraw()
+  local grid_h = g.rows
+  g:all(0)
+  local grid_x = math.floor((focus.x + #dvd_icon_table[1]) / 8) + 1
+  local grid_y = math.floor((focus.y + #dvd_icon_table) / 8) + 1
+  g:led(grid_x, grid_y, 15)
+  g:refresh()
+  -- g:led(1, 1, 15);g:refresh();
+end
+
+
 function step()
   -- while true do
     -- clock.sync(1/60)
@@ -190,11 +207,11 @@ function step()
     local freq = MusicUtil.note_num_to_freq(note_num)
     print("we are triggering a note: " .. note_num .. " at freq: " .. freq)
     engine.hz(freq)
+    crow.output[1].volts = (note_num-60)/12
+    crow.output[2].action = "{to(8,0.15),to(0,1)}"
+    crow.output[2].execute()
   -- notes_off_metro:start((60 / params:get("clock_tempo") / params:get("step_div")) * params:get("note_length") * 0.25, 1)
   end
-  
-
-
 
 end
 
