@@ -7,7 +7,10 @@
 -- >> e2:
 -- >> e3:
 
-engine.name = 'PolyPerc'
+-- engine.name = 'PolyPerc'
+MollyThePoly = require "molly_the_poly/lib/molly_the_poly_engine"
+engine.name = "MollyThePoly"
+
 hs = include('lib/halfsecond')
 
 MusicUtil = require "musicutil"
@@ -55,16 +58,19 @@ function build_scale()
   end
 end
 
--- notes_off_metro = metro.init()
+notes_off_metro = metro.init()
 
--- function all_notes_off()
---   if (params:get("out") == 2 or params:get("out") == 3) then
---     for _, a in pairs(active_notes) do
---       midi_device:note_off(a, nil, midi_channel)
---     end
---   end
---   active_notes = {}
--- end
+function all_notes_off()
+  engine.noteOffAll()
+
+  -- engine.noteOff(noteNumber)
+  -- if (params:get("out") == 2 or params:get("out") == 3) then
+  --   for _, a in pairs(active_notes) do
+  --     midi_device:note_off(a, nil, midi_channel)
+  --   end
+  -- end
+  -- active_notes = {}
+end
 
 function init() ------------------------------ init() is automatically called by norns
   message = "DVD Menu" ----------------- set our initial message
@@ -81,7 +87,7 @@ function init() ------------------------------ init() is automatically called by
   build_scale()
   hs.init()
   step_id = clock.run(step)
-  -- notes_off_metro.event = all_notes_off
+  notes_off_metro.event = all_notes_off
 end
 
 function init_params()
@@ -96,6 +102,10 @@ function init_params()
     params:add{type = "option", id = "scale_mode", name = "scale mode",
       options = scale_names, default = 5,
       action = function() build_scale() end}
+    if engine.name == "MollyThePoly" then
+      MollyThePoly.add_params()
+    end
+    
 end
 
 function enc(e, d) --------------- enc() is automatically called by norns
@@ -268,11 +278,17 @@ function sequence_step()
     local note_num = notes[one.data[one.pos]+two.data[two.pos]]
     local freq = MusicUtil.note_num_to_freq(note_num)
     print("we are triggering a note: " .. note_num .. " at freq: " .. freq)
-    engine.hz(freq)
+    if engine.name == "MollyThePoly" then
+      -- engine.noteOn(69, 440, 127)
+      engine.noteOn(note_num, freq, 1)
+    else
+      engine.hz(freq)
+    end
+  
     crow.output[1].volts = (note_num-60)/12
     crow.output[2].action = "{to(8,0.15),to(0,1)}"
     crow.output[2].execute()
-  -- notes_off_metro:start((60 / params:get("clock_tempo") / params:get("step_div")) * params:get("note_length") * 0.25, 1)
+    notes_off_metro:start((60 / params:get("clock_tempo") / params:get("step_div")) * params:get("note_length") * 0.25, 1)
   end
 
 end
