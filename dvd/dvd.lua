@@ -1,11 +1,26 @@
--- HTTPS://NOR.THE-RN.INFO
--- NORNSILERPLATE
+--          ▓▓▓▓▓▓  ▓▓▓▓▓▓ 
+--         ▓▓▓ ▓▓▓ ▓▓▓▓▓ ▓▓
+--         ▓▓  ▓▓▓▓▓ ▓▓  ▓▓
+--         ▓▓▓▓  ▓▓  ▓▓▓▓▓ 
+--                ▓        
+--            ▓▓▓▓▓▓▓▓     
+--         ▓▓▓▓▓    ▓▓▓▓▓▓▓
+--           ▓▓▓▓▓▓▓▓▓▓    
+-- 
+-- DVD - screensaver
+-- 0.1 @laferrera
+-- llllllll.co/t/TBD
+
 -- >> k1: exit
--- >> k2:
--- >> k3:
--- >> e1:
--- >> e2:
--- >> e3:
+-- >> e1: change mode
+-- mode 1 / screensaver
+-- >> k2: generate random sequence A
+-- >> k3: generate random sequence B
+-- >> e1: volume
+-- >> e2: move X
+-- >> e3: move Y
+-- mode 2 / scales
+
 
 -- engine.name = 'PolyPerc'
 MollyThePoly = require "molly_the_poly/lib/molly_the_poly_engine"
@@ -30,17 +45,19 @@ dvd_icon_table = {
   {0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,},
   {0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,},
   {1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,},
-  {0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,}}
+  {0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,}
+}
+
+viewport_right_edge = viewport.width - #dvd_icon_table[1] - 2
+viewport_bottom_edge = viewport.height - #dvd_icon_table - 2
 
 one = {
   pos = 0,
-  length = 4,
   data = {1,3,5,7}
 }
 
 two = {
   pos = 1,
-  length = 4,
   data = {1,3,5,7}
 }
 
@@ -49,13 +66,12 @@ notes = {}
 active_notes = {}
 g = grid.connect()
 
+mode = 1
+mode_names = {"SCREENSAVER", "SCALES"}
+
+
 function build_scale()
-  notes = MusicUtil.generate_scale_of_length(params:get("root_note"), params:get("scale_mode"), 16)
-  notes = MusicUtil.generate_scale_of_length(params:get("root_note"), params:get("scale_mode"), 16)
-  local num_to_add = 16 - #notes
-  for i = 1, num_to_add do
-    table.insert(notes, notes[16 - num_to_add])
-  end
+  notes = MusicUtil.generate_scale_of_length(params:get("root_note"), params:get("scale_mode"), 32)
 end
 
 notes_off_metro = metro.init()
@@ -72,6 +88,12 @@ function all_notes_off()
   -- active_notes = {}
 end
 
+function generate_random_sequence(sqns)
+  for i = 1, #sqns.notes do
+    sqns.data[i] = math.random(1, 32)
+  end
+end
+
 function init() ------------------------------ init() is automatically called by norns
   message = "DVD Menu" ----------------- set our initial message
   screen_dirty = true ------------------------ ensure we only redraw when something changes
@@ -86,13 +108,13 @@ function init() ------------------------------ init() is automatically called by
   init_params()
   build_scale()
   hs.init()
-  step_id = clock.run(step)
+  step_clock_id = clock.run(step)
   notes_off_metro.event = all_notes_off
 end
 
 function init_params()
     params:add_separator("DVD")
-    params:add{type = "number", id = "step_div", name = "step division", min = 1, max = 16, default = 4}
+    params:add{type = "number", id = "step_div", name = "step division", min = 1, max = 32, default = 16}
     params:add{type = "option", id = "note_length", name = "note length",
       options = {"25%", "50%", "75%", "100%"},
       default = 4}
@@ -109,9 +131,17 @@ function init_params()
 end
 
 function enc(e, d) --------------- enc() is automatically called by norns
-  if e == 1 then turn(e, d) end -- turn encoder 1
-  if e == 2 then turn(e, d) end -- turn encoder 2
-  if e == 3 then turn(e, d) end -- turn encoder 3
+  if mode == 1 then
+    if e == 1 then turn(e, d) end -- turn encoder 1
+    if e == 2 then turn(e, d) 
+      -- change focus.x in bounds
+      focus.x = math.max(0,math.min((focus.x + d), viewport_right_edge))
+    end -- 
+    if e == 3 then turn(e, d) 
+      -- change focus.y in bounds
+      focus.y = math.max(0,math.min((focus.y + d), viewport_bottom_edge))
+    end 
+  end -- end mode 1
   screen_dirty = true ------------ something changed
 end
 
@@ -128,6 +158,11 @@ end
 
 function press_down(i) ---------- a key has been pressed
   message = "press down " .. i -- build a message
+  if mode_names[mode] == "SCREENSAVER" then
+    if i == 2 then generate_random_sequence(one) end
+    if i == 3 then generate_random_sequence(two) end
+  end
+
 end
 
 
@@ -135,7 +170,6 @@ function step()
   while true do
     clock.sync(1/params:get("step_div"))
     sequence_step()
-    screen_dirty = true
     if g then
         grid_redraw()
       end
@@ -164,19 +198,22 @@ end
 function redraw() -------------- redraw() is automatically called by norns
   screen.clear() --------------- clear space
   screen.aa(1) ----------------- enable anti-aliasing
-  draw_dvd_icon()
-
-
---   screen.font_face(1) ---------- set the font face to "04B_03"
---   screen.font_size(8) ---------- set the size to 8
---   screen.level(15) ------------- max
---   screen.move(64, 32) ---------- move the pointer to x = 64, y = 32
---   screen.text_center(message) -- center our message at (64, 32)
---   screen.pixel(0, 0) ----------- make a pixel at the north-western most terminus
---   screen.pixel(127, 0) --------- and at the north-eastern
---   screen.pixel(127, 63) -------- and at the south-eastern
---   screen.pixel(0, 63) ---------- and at the south-western
---   screen.fill() ---------------- fill the termini and message at once
+  if mode_names[mode] == "SCREENSAVER" then
+    draw_dvd_icon()
+  elseif mode_names[mode] == "SCALES" then
+    screen.level(1)
+    screen.move(0,30)
+    screen.text(snd_names[snd_sel])
+    screen.level(15)
+    screen.move(0,40)
+    screen.text(params:string(snd_params[snd_sel]))
+    screen.level(1)
+    screen.move(0,50)
+    screen.text(snd_names[snd_sel+1])
+    screen.level(15)
+    screen.move(0,60)
+    screen.text(params:string(snd_params[snd_sel+1]))
+  end
   screen.update() -------------- update space
 end
 
@@ -221,7 +258,7 @@ end
 
 function stop()
   running = false
-  -- all_notes_off()
+  all_notes_off()
 end
 
 function start()
@@ -250,36 +287,43 @@ function r() ----------------------------- execute r() in the repl to quickly re
 end
 
 function cleanup() --------------- cleanup() is automatically called on script close
-  clock.cancel(step_id) -- melt our clock vie the id we noted
+  clock.cancel(step_clock_id) -- melt our clock vie the id we noted
 end
 
 function sequence_step()
-  -- while true do
-    -- clock.sync(1/60)
-  local curFocus = focus
+  
   local trigger_note = false
-  curFocus.x = focus.x + movement_vector.x
-  curFocus.y = focus.y + movement_vector.y
-  if ((curFocus.x + #dvd_icon_table[1]) > (viewport.width - 2)) or (curFocus.x < 0) then
-    focus.x = curFocus.x
+  focus.x = focus.x + movement_vector.x
+  focus.y = focus.y + movement_vector.y
+  if ((focus.x > viewport_right_edge) or (focus.x < 0)) then
     movement_vector.x = -movement_vector.x
     trigger_note = true
   end
-  if ((curFocus.y + #dvd_icon_table) > (viewport.height -2)) or (curFocus.y < 0) then
-    focus.y = curFocus.y
+  if ((focus.y > viewport_bottom_edge) or (focus.y < 0)) then
     movement_vector.y = -movement_vector.y
     trigger_note = true
   end
 
+  screen_dirty = true
+
   if trigger_note then
     dvd_icon_fill_level = math.random(13) + 2
     one.pos = one.pos + 1
-    if one.pos > one.length then one.pos = 1 end
-    local note_num = notes[one.data[one.pos]+two.data[two.pos]]
+    if one.pos > #one.data then 
+      one.pos = 1 
+      two.pos = two.pos + 1
+      if two.pos > #two.data then
+        two.pos = 1
+      end
+    end
+
+    -- we subtract one note one.data+two.data so we actual can hit the root note
+    -- if they are both in first position
+    local note_num = notes[one.data[one.pos]+two.data[two.pos]-1]
     local freq = MusicUtil.note_num_to_freq(note_num)
     print("we are triggering a note: " .. note_num .. " at freq: " .. freq)
+    
     if engine.name == "MollyThePoly" then
-      -- engine.noteOn(69, 440, 127)
       engine.noteOn(note_num, freq, 1)
     else
       engine.hz(freq)
@@ -290,5 +334,4 @@ function sequence_step()
     crow.output[2].execute()
     notes_off_metro:start((60 / params:get("clock_tempo") / params:get("step_div")) * params:get("note_length") * 0.25, 1)
   end
-
 end
