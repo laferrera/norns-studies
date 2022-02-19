@@ -68,7 +68,7 @@ g = grid.connect()
 
 mode = 1
 mode_names = {"SCREENSAVER", "SCALES"}
-
+dest = {"192.168.1.164" , 10101}
 
 function build_scale()
   notes = MusicUtil.generate_scale_of_length(params:get("root_note"), params:get("scale_mode"), 32)
@@ -307,6 +307,7 @@ function sequence_step()
   screen_dirty = true
 
   if trigger_note then
+
     dvd_icon_fill_level = math.random(13) + 2
     one.pos = one.pos + 1
     if one.pos > #one.data then 
@@ -332,6 +333,8 @@ function sequence_step()
     crow.output[1].volts = (note_num-60)/12
     crow.output[2].action = "{to(8,0.15),to(0,1)}"
     crow.output[2].execute()
+
+    osc.send(dest,"/note_trigger",{note_num, freq})
     notes_off_metro:start((60 / params:get("clock_tempo") / params:get("step_div")) * params:get("note_length") * 0.25, 1)
   end
 end
